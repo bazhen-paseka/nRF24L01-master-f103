@@ -62,7 +62,7 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-#define MASTER
+//#define MASTER
 #define MY_CHANNEL 106
 
 #ifdef MASTER
@@ -113,9 +113,9 @@ int main(void)
   /* USER CODE BEGIN 2 */
 	char DataChar[100];
 #ifdef MASTER
-		sprintf(DataChar,"\r\n nRF24L01 v1.0.0\r\n MASTER\r\nUART1 for debug started on speed 115200\r\n");
+		sprintf(DataChar,"\r\n nRF24L01 MASTER v1.0.0 \r\nUART1 for debug started on speed 115200\r\n");
 #else
-		sprintf(DataChar,"\r\n nRF24L01 v1.0.0\r\n SLAVE\r\nUART1 for debug started on speed 115200\r\n");
+		sprintf(DataChar,"\r\n nRF24L01 SLAVE v1.0.0 \r\nUART1 for debug started on speed 115200\r\n");
 #endif
 	HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
@@ -129,7 +129,7 @@ int main(void)
 	uint8_t errors = 0;
 #endif
 	uint32_t lastTime = HAL_GetTick();
-	int16_t i = 0;
+	int16_t  waitTime = 0;
 
   /* USER CODE END 2 */
 
@@ -139,6 +139,7 @@ int main(void)
   {
 #ifdef MASTER
 	if (HAL_GetTick() - lastTime > 2000) {			/* Every 2 seconds */
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 		sprintf((char *) dataOut, "Good f103 news  #%d", i++);
 		sprintf(DataChar,"TX: ");
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
@@ -189,10 +190,12 @@ int main(void)
 		sprintf(DataChar,"\r\n");
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 		lastTime = HAL_GetTick();
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 	}
 #else
 	/* If data is ready on NRF24L01+ */
 	if (NRF24L01_DataReady()) {
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 		/* Get data from NRF24L01+ */
 		NRF24L01_GetData(dataIn);
 		HAL_Delay(1);
@@ -208,17 +211,12 @@ int main(void)
 
 		/* Check data & transmit status */
 
-		sprintf(DataChar,"\r\nData received:\r\n");
+		sprintf(DataChar,"\r\nRX: %s\r\n", dataIn);
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
-		sprintf(DataChar,"%s\r\n", dataIn);
+		sprintf(DataChar,"Send it back: ");
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
-		sprintf(DataChar,"Sending it back\r\n");
-		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-
-		sprintf(DataChar,"Status: ");
-		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 		if (transmissionStatus == NRF24L01_Transmit_Status_Ok) {
 			/* Transmit went OK */
 			sprintf(DataChar,"OK\r\n");
@@ -231,21 +229,22 @@ int main(void)
 
 		/* Go back to RX mode */
 		NRF24L01_PowerUpRx();
-		i = 0;
+		waitTime = 0;
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 	} else {
 		if (HAL_GetTick() - lastTime > 250) {
-			if (i == 0) {
-			sprintf(DataChar,"Waiting for data");
+			if (waitTime == 0) {
+			sprintf(DataChar,"\r\nWaiting for data");
 				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-				i++;
-			} else if (i > 17) {
+				waitTime++;
+			} else if (waitTime > 17) {
 			sprintf(DataChar,"\r\n");
 				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-				i = 0;
+				waitTime = 0;
 			} else {
 			sprintf(DataChar,".");
 				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-				i++;
+				waitTime++;
 			}
 			lastTime = HAL_GetTick();
 		}
