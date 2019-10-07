@@ -62,16 +62,20 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+#define MASTER
 #define MY_CHANNEL 106
-/* My address */
-uint8_t MyAddress[] = { 0x56, 0x56, 0x56, 0x56, 0x56 };
-/* Other end address */
-uint8_t TxAddress[] = { 0x65, 0x65, 0x65, 0x65, 0x65 };
-/* Data received and data for send */
-// uint8_t dataOut[32];
-uint8_t dataIn[32];
-/* NRF transmission status */
-NRF24L01_Transmit_Status_t transmissionStatus;
+
+#ifdef MASTER
+	uint8_t MyAddress[] = { 0x65, 0x65, 0x65, 0x65, 0x65 };	/* My address */
+	uint8_t TxAddress[] = { 0x56, 0x56, 0x56, 0x56, 0x56 };	/* Other end address */
+#else
+	uint8_t MyAddress[] = { 0x56, 0x56, 0x56, 0x56, 0x56 };	/* My address */
+	uint8_t TxAddress[] = { 0x65, 0x65, 0x65, 0x65, 0x65 };	/* Other end address */
+#endif
+
+	uint8_t dataOut[32];	/* Data received and data for send */
+	uint8_t dataIn[32];
+	NRF24L01_Transmit_Status_t transmissionStatus;	/* NRF transmission status */
 
 /* USER CODE END 0 */
 
@@ -108,16 +112,17 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 	char DataChar[100];
-	sprintf(DataChar,"\r\n nRF24L01 v1.0.0\r\nUART1 for debug started on speed 115200\r\n");
+#ifdef MASTER
+		sprintf(DataChar,"\r\n nRF24L01 v1.0.0\r\n MASTER\r\nUART1 for debug started on speed 115200\r\n");
+#else
+		sprintf(DataChar,"\r\n nRF24L01 v1.0.0\r\n SLAVE\r\nUART1 for debug started on speed 115200\r\n");
+#endif
 	HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
 	NRF24L01_Init(&hspi2, MY_CHANNEL, 32);
-	/* Set 250kBps data rate and -6dBm output power */
-	NRF24L01_SetRF(NRF24L01_DataRate_250k, NRF24L01_OutputPower_M6dBm);
-	/* Set my address, 5 bytes */
-	NRF24L01_SetMyAddress(MyAddress);
-	/* Set TX address, 5 bytes */
-	NRF24L01_SetTxAddress(TxAddress);
+	NRF24L01_SetRF(NRF24L01_DataRate_250k, NRF24L01_OutputPower_M6dBm);	/* Set 250kBps data rate and -6dBm output power */
+	NRF24L01_SetMyAddress(MyAddress);	/* Set my address, 5 bytes */
+	NRF24L01_SetTxAddress(TxAddress);	/* Set TX address, 5 bytes */
 
 #ifdef MASTER
 	uint32_t sendTime = HAL_GetTick();
@@ -132,140 +137,119 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
 #ifdef MASTER
-		/* Every 2 seconds */
-		if (HAL_GetTick() - lastTime > 2000) {
+	if (HAL_GetTick() - lastTime > 2000) {			/* Every 2 seconds */
+		sprintf((char *) dataOut, "Good f103 news  #%d", i++);
+		sprintf(DataChar,"TX: ");
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		sprintf(DataChar,"%s\r\n", dataOut);
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
-			/* Fill data with something */
-			sprintf((char *) dataOut, "Good news everyone! #%d", i++);
-			//LCD_Printf("Sending data: \n");
-			sprintf(DataChar,"Sending data: \r\n");
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		/* Transmit data, goes automatically to TX mode */
+		NRF24L01_Transmit(dataOut);
+		/* Wait for data to be sent */
+		do {
+			/* Get transmission status */
+			transmissionStatus = NRF24L01_GetTransmissionStatus();
+		} while (transmissionStatus == NRF24L01_Transmit_Status_Sending);
+		sendTime = HAL_GetTick();
 
-			//LCD_Printf("%s\n", dataOut);
-			sprintf(DataChar,"%s\n", dataOut);
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		/* Go back to RX mode */
+		NRF24L01_PowerUpRx();
+		/* Wait received data, wait max 100ms, if time is larger, then data were probably lost */
+		while (!NRF24L01_DataReady() && (HAL_GetTick() - sendTime) < 100);
+		sprintf(DataChar,"RX: ");
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		NRF24L01_GetData(dataIn);				/* Get data from NRF2L01+ */
+		sprintf(DataChar,"%s\r\n", dataIn);
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		sprintf(DataChar,"Ping  : %d ms\r\n", (int)(HAL_GetTick() - sendTime));				/* Show ping time */
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
-			/* Transmit data, goes automatically to TX mode */
-			NRF24L01_Transmit(dataOut);
-			/* Wait for data to be sent */
-			do {
-				/* Get transmission status */
-				transmissionStatus = NRF24L01_GetTransmissionStatus();
-			} while (transmissionStatus == NRF24L01_Transmit_Status_Sending);
-			sendTime = HAL_GetTick();
-
-			/* Go back to RX mode */
-			NRF24L01_PowerUpRx();
-			/* Wait received data, wait max 100ms, if time is larger, then data were probably lost */
-			while (!NRF24L01_DataReady() && (HAL_GetTick() - sendTime) < 100);
-
-			/* Show ping time */
-			//LCD_Printf("%d ms\n", HAL_GetTick() - sendTime);
-			sprintf(DataChar,"%d ms\r\n", HAL_GetTick() - sendTime);
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			//LCD_Printf("Receiving back: \n");
-			sprintf(DataChar,"Receiving back: \r\n");
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			/* Get data from NRF2L01+ */
-			NRF24L01_GetData(dataIn);
-			//LCD_Printf("%s\n", dataIn);
-			sprintf(DataChar,"%s\r\n", dataIn);
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			/* Check transmit status */
-			//LCD_Printf("Status: ");
 		sprintf(DataChar,"Status: ");
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			if (transmissionStatus == NRF24L01_Transmit_Status_Ok) {
-				/* Transmit went OK */
-				//LCD_Printf("OK\n");
-				sprintf(DataChar,"OK\r\n");
-				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			} else if (transmissionStatus == NRF24L01_Transmit_Status_Lost) {
-				/* Message was LOST */
-				//LCD_Printf("LOST\n");
-				sprintf(DataChar,"LOST\r\n");
-				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			} else {
-				/* This should never happen */
-			//LCD_Printf("SENDING\n");
-				sprintf(DataChar,"Sending data: \r\n");
-				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			}
+		if (transmissionStatus == NRF24L01_Transmit_Status_Ok) {	/* Check transmit status */
+			sprintf(DataChar,"OK\r\n");					/* Transmit went OK */
+			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		} else if (transmissionStatus == NRF24L01_Transmit_Status_Lost) {
+			sprintf(DataChar,"LOST\r\n");		/* Message was LOST */
+			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		} else {
+			/* This should never happen */
+			sprintf(DataChar,"Sending data: \r\n");
+			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		}
 
-			errors = 0;
-			for (int k = 0; k < sizeof(dataIn) / sizeof(dataIn[0]); k++) {
-				errors += (dataIn[k]!=dataOut[k]);
-			}
-			//LCD_Printf("Errors: %d\n", errors);
-			sprintf(DataChar,"Errors: %d\r\n", errors);
+		errors = 0;
+		for (int k = 0; k < sizeof(dataIn) / sizeof(dataIn[0]); k++) {
+			errors += (dataIn[k]!=dataOut[k]);
+		}
+		sprintf(DataChar,"Errors: %d\r\n", errors);
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		sprintf(DataChar,"\r\n");
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		lastTime = HAL_GetTick();
+	}
+#else
+	/* If data is ready on NRF24L01+ */
+	if (NRF24L01_DataReady()) {
+		/* Get data from NRF24L01+ */
+		NRF24L01_GetData(dataIn);
+		HAL_Delay(1);
+		/* Send it back, automatically goes to TX mode */
+		NRF24L01_Transmit(dataIn);
+
+		/* Wait for data to be sent */
+		do {
+			/* Wait till sending */
+			transmissionStatus = NRF24L01_GetTransmissionStatus();
+		} while (transmissionStatus == NRF24L01_Transmit_Status_Sending);
+		/* Send done */
+
+		/* Check data & transmit status */
+
+		sprintf(DataChar,"\r\nData received:\r\n");
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+		sprintf(DataChar,"%s\r\n", dataIn);
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+		sprintf(DataChar,"Sending it back\r\n");
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+		sprintf(DataChar,"Status: ");
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		if (transmissionStatus == NRF24L01_Transmit_Status_Ok) {
+			/* Transmit went OK */
+			sprintf(DataChar,"OK\r\n");
 			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			//LCD_Printf("\n");
+		} else {
+			/* Message was LOST */
+			sprintf(DataChar,"ERROR\r\n");
+			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		}
+
+		/* Go back to RX mode */
+		NRF24L01_PowerUpRx();
+		i = 0;
+	} else {
+		if (HAL_GetTick() - lastTime > 250) {
+			if (i == 0) {
+			sprintf(DataChar,"Waiting for data");
+				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+				i++;
+			} else if (i > 17) {
 			sprintf(DataChar,"\r\n");
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+				i = 0;
+			} else {
+			sprintf(DataChar,".");
+				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+				i++;
+			}
 			lastTime = HAL_GetTick();
 		}
-#else
-		/* If data is ready on NRF24L01+ */
-		if (NRF24L01_DataReady()) {
-			/* Get data from NRF24L01+ */
-			NRF24L01_GetData(dataIn);
-			HAL_Delay(1);
-			/* Send it back, automatically goes to TX mode */
-			NRF24L01_Transmit(dataIn);
-
-			/* Wait for data to be sent */
-			do {
-				/* Wait till sending */
-				transmissionStatus = NRF24L01_GetTransmissionStatus();
-			} while (transmissionStatus == NRF24L01_Transmit_Status_Sending);
-			/* Send done */
-
-			/* Check data & transmit status */
-
-			sprintf(DataChar,"\r\nData received:\r\n");
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-
-			sprintf(DataChar,"%s\r\n", dataIn);
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-
-			sprintf(DataChar,"Sending it back\r\n");
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-
-			sprintf(DataChar,"Status: ");
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			if (transmissionStatus == NRF24L01_Transmit_Status_Ok) {
-				/* Transmit went OK */
-				sprintf(DataChar,"OK\r\n");
-				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			} else {
-				/* Message was LOST */
-				sprintf(DataChar,"ERROR\r\n");
-				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			}
-
-			/* Go back to RX mode */
-			NRF24L01_PowerUpRx();
-			i = 0;
-		} else {
-			if (HAL_GetTick() - lastTime > 250) {
-			    if (i == 0) {
-			   	sprintf(DataChar,"Waiting for data");
-					HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			        i++;
-			    } else if (i > 17) {
-			   	sprintf(DataChar,"\r\n");
-					HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			        i = 0;
-			    } else {
-			   	sprintf(DataChar,".");
-					HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-			        i++;
-			    }
-			    lastTime = HAL_GetTick();
-			}
-		}
+	}
 #endif
 
     /* USER CODE END WHILE */
@@ -288,7 +272,11 @@ void SystemClock_Config(void)
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -297,12 +285,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
