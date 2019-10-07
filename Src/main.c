@@ -62,20 +62,25 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-//#define MASTER
-#define MY_CHANNEL 106
+	uint8_t dataOut[32];	/* Data received and data for send */
+	uint8_t  dataIn[32];
+	NRF24L01_Transmit_Status_t transmissionStatus;	/* NRF transmission status */
 
 #ifdef MASTER
-	uint8_t MyAddress[] = { 0x65, 0x65, 0x65, 0x65, 0x65 };	/* My address */
-	uint8_t TxAddress[] = { 0x56, 0x56, 0x56, 0x56, 0x56 };	/* Other end address */
-#else
-	uint8_t MyAddress[] = { 0x56, 0x56, 0x56, 0x56, 0x56 };	/* My address */
-	uint8_t TxAddress[] = { 0x65, 0x65, 0x65, 0x65, 0x65 };	/* Other end address */
+	uint8_t MyAddress[] = { 0, 0, 0, 0, 0x10 };	/* My address */
+	uint8_t Tx0Address[] = { 0, 0, 0, 0, 0x21 };	/* Other end address */
+	uint8_t Tx1Address[] = { 0, 0, 0, 0, 0x22 };	/* Other end address */
 #endif
 
-	uint8_t dataOut[32];	/* Data received and data for send */
-	uint8_t dataIn[32];
-	NRF24L01_Transmit_Status_t transmissionStatus;	/* NRF transmission status */
+#ifdef SLAVE_21
+	uint8_t MyAddress[] = { 0, 0, 0, 0, 0x21 };	/* My address */
+	uint8_t TxAddress[] = { 0, 0, 0, 0, 0x10 };	/* Other end address */
+#endif
+
+#ifdef SLAVE_22
+	uint8_t MyAddress[] = { 0, 0, 0, 0, 0x22 };	/* My address */
+	uint8_t TxAddress[] = { 0, 0, 0, 0, 0x10 };	/* Other end address */
+#endif
 
 /* USER CODE END 0 */
 
@@ -111,6 +116,7 @@ int main(void)
   MX_SPI2_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+
 	char DataChar[100];
 #ifdef MASTER
 		sprintf(DataChar,"\r\n nRF24L01 MASTER v1.0.0 \r\nUART1 for debug started on speed 115200\r\n");
@@ -122,7 +128,7 @@ int main(void)
 	NRF24L01_Init(&hspi2, MY_CHANNEL, 32);
 	NRF24L01_SetRF(NRF24L01_DataRate_250k, NRF24L01_OutputPower_M6dBm);	/* Set 250kBps data rate and -6dBm output power */
 	NRF24L01_SetMyAddress(MyAddress);	/* Set my address, 5 bytes */
-	NRF24L01_SetTxAddress(TxAddress);	/* Set TX address, 5 bytes */
+	//NRF24L01_SetTxAddress(TxAddress);	/* Set TX address, 5 bytes */
 
 #ifdef MASTER
 	uint32_t sendTime = HAL_GetTick();
@@ -130,7 +136,7 @@ int main(void)
 #endif
 	uint32_t lastTime = HAL_GetTick();
 	int16_t  waitTime = 0;
-
+	uint32_t ID_counter = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -139,11 +145,20 @@ int main(void)
   {
 #ifdef MASTER
 	if (HAL_GetTick() - lastTime > 2000) {			/* Every 2 seconds */
-		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
-		sprintf((char *) dataOut, "Good f103 news  #%d", i++);
-		sprintf(DataChar,"TX: ");
+		if  ((ID_counter++)%2 == 1){
+			NRF24L01_SetTxAddress(Tx0Address);	/* Set TX address, 5 bytes */
+			sprintf(DataChar,"dev20\r\n");
+		} else {
+			NRF24L01_SetTxAddress(Tx1Address);	/* Set TX address, 5 bytes */
+			sprintf(DataChar,"dev21\r\n");
+		}
+
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-		sprintf(DataChar,"%s\r\n", dataOut);
+
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+		sprintf((char *) dataOut, "Good f103 news  #%d", waitTime++);
+
+		sprintf(DataChar,"TX: %s\r\n", dataOut);
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
 		/* Transmit data, goes automatically to TX mode */
