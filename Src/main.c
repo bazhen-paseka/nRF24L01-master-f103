@@ -149,26 +149,30 @@ int main(void)
   {
 #ifdef MASTER
 	if (HAL_GetTick() - lastTime > 1000) {			/* Every 2 seconds */
-		char serial_number[8];
-		DS18b20_Get_serial_number(serial_number);
 
-		for (int i=0; i<8; i++) {
-		sprintf(DataChar,"%X ", serial_number[i]);
-		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-		}
+		char serial_number[8] = {0x28, 0xFF, 0x55, 0x64, 0x4C, 0x04, 0x00, 0x20};
 
-		sprintf(DataChar,"\r\n");
-		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-
-//		char scratchpad[9];
-//		DS18b20_Read_scratchpad(scratchpad);
-//		for (int i=0; i<9; i++) {
+//		memset(serial_number,0,8);
+//		DS18b20_Get_serial_number(serial_number);
+//
+//		for (int i=0; i<8; i++) {
 //		sprintf(DataChar,"%X ", serial_number[i]);
 //		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 //		}
 
-		sprintf(DataChar,"\r\n");
+//		sprintf(DataChar,"\r\n");
+//		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+		char scratchpad[9];
+		//memset(scratchpad, 0, 9);
+		DS18b20_Read_scratchpad(scratchpad, serial_number);
+		for (int i=0; i<9; i++) {
+		sprintf(DataChar,"%02X ", scratchpad[i]);
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		}
+
+//		sprintf(DataChar,"\r\n");
+//		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
 
 
