@@ -163,13 +163,7 @@ int main(void)
 //		sprintf(DataChar,"\r\n");
 //		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
-		char scratchpad[9];
-		//memset(scratchpad, 0, 9);
-		DS18b20_Read_scratchpad(scratchpad, serial_number);
-		for (int i=0; i<9; i++) {
-		sprintf(DataChar,"%02X ", scratchpad[i]);
-		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-		}
+
 
 //		sprintf(DataChar,"\r\n");
 //		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
@@ -177,9 +171,22 @@ int main(void)
 
 
 		if  ((ID_counter++)%2 == 1){
+			ConvertTemp(serial_number);
 			NRF24L01_SetTxAddress(Tx0Address);	/* Set TX address, 5 bytes */
-			sprintf(DataChar,"\r\n%d)dev20\r\n", (int)ID_counter);
+			sprintf(DataChar,"Convert\r\n%d)dev20\r\n", (int)ID_counter);
 		} else {
+			char scratchpad[9];
+			DS18b20_Read_scratchpad(scratchpad, serial_number);
+			//for (int i=0; i<9; i++) {
+				//uint16_t temp2 = ((scratchpad[1]<<8) + scratchpad[0])>>4;
+				uint16_t temp_1 =  ((0b00000111&scratchpad[1])<<8) | scratchpad[0];
+				float temp_fl = temp_1/16.0;
+				uint16_t temp2 = (int)(temp_fl*100.0);
+				sprintf(DataChar,"Temp: %d.%d", temp2/100, temp2%100);
+				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+			//}
+
 			NRF24L01_SetTxAddress(Tx1Address);	/* Set TX address, 5 bytes */
 			sprintf(DataChar,"\r\n%d)dev21\r\n", (int)ID_counter);
 		}
