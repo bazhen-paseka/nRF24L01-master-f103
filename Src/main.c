@@ -150,30 +150,45 @@ int main(void)
 #ifdef MASTER
 	if (HAL_GetTick() - lastTime > 1000) {			/* Every 2 seconds */
 
-		uint8_t present = DS18b20_Start_strob();
-		if (present){
-			sprintf(DataChar,"ds18b20 present\r\n");
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-		} else {
-			sprintf(DataChar,"ds18b20 absent\r\n");
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-		}
+		char serial_number[8] = {0x28, 0xFF, 0x55, 0x64, 0x4C, 0x04, 0x00, 0x20};
 
-		DS18b20_Send_byte(0xCC);
-		DS18b20_Send_byte(0x33);
-		for (int i = 0; i<8; i++) {
-			uint8_t ds_res = DS18b20_Read_byte();
-			sprintf(DataChar," %X",ds_res);
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-		}
+//		memset(serial_number,0,8);
+//		DS18b20_Get_serial_number(serial_number);
+//
+//		for (int i=0; i<8; i++) {
+//		sprintf(DataChar,"%X ", serial_number[i]);
+//		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+//		}
+
+//		sprintf(DataChar,"\r\n");
+//		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+
+
+//		sprintf(DataChar,"\r\n");
+//		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
 
 
 		if  ((ID_counter++)%2 == 1){
+			ConvertTemp(serial_number);
 			NRF24L01_SetTxAddress(Tx0Address);	/* Set TX address, 5 bytes */
-			sprintf(DataChar,"\r\ndev20\r\n");
+			sprintf(DataChar,"Convert\r\n%d)dev20\r\n", (int)ID_counter);
 		} else {
+			char scratchpad[9];
+			DS18b20_Read_scratchpad(scratchpad, serial_number);
+			//for (int i=0; i<9; i++) {
+				//uint16_t temp2 = ((scratchpad[1]<<8) + scratchpad[0])>>4;
+				uint16_t temp_1 =  ((0b00000111&scratchpad[1])<<8) | scratchpad[0];
+				float temp_fl = temp_1/16.0;
+				uint16_t temp2 = (int)(temp_fl*100.0);
+				sprintf(DataChar,"Temp: %d.%d", temp2/100, temp2%100);
+				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+			//}
+
 			NRF24L01_SetTxAddress(Tx1Address);	/* Set TX address, 5 bytes */
-			sprintf(DataChar,"\r\ndev21\r\n");
+			sprintf(DataChar,"\r\n%d)dev21\r\n", (int)ID_counter);
 		}
 
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
