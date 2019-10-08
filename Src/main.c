@@ -37,6 +37,7 @@
 /* USER CODE BEGIN PTD */
 
 volatile uint32_t stop_flag = 0;
+// volatile uint32_t ds18b20_present = 0;
 
 /* USER CODE END PTD */
 
@@ -142,7 +143,7 @@ int main(void)
 	int16_t  waitTime = 0;
 	uint32_t ID_counter = 0;
 
-	HAL_GPIO_WritePin(DQ_GPIO_Port, DQ_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(DQ2_GPIO_Port, DQ2_Pin, GPIO_PIN_SET);
 	HAL_TIM_Base_Start_IT(&htim3);
 
   /* USER CODE END 2 */
@@ -154,15 +155,28 @@ int main(void)
 #ifdef MASTER
 	if (HAL_GetTick() - lastTime > 1000) {			/* Every 2 seconds */
 
+		TIM3->ARR = 480;
+		TIM3->CNT = 0;
 		HAL_TIM_Base_Start(&htim3);
-		HAL_GPIO_WritePin(DQ_GPIO_Port, DQ_Pin, GPIO_PIN_RESET);
-
-		//HAL_Delay(1);
-		do	{
-		} while (stop_flag == 0);
+		HAL_GPIO_WritePin(DQ2_GPIO_Port, DQ2_Pin, GPIO_PIN_RESET);
+		do	{		} while (stop_flag == 0);
 		HAL_TIM_Base_Stop(&htim3);
-		HAL_GPIO_WritePin(DQ_GPIO_Port, DQ_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(DQ2_GPIO_Port, DQ2_Pin, GPIO_PIN_SET);
 		stop_flag = 0;
+
+		TIM3->ARR = 60;
+		TIM3->CNT = 0;
+		HAL_TIM_Base_Start(&htim3);
+		do	{		} while (stop_flag == 0);
+		HAL_TIM_Base_Stop(&htim3);
+		stop_flag = 0;
+		GPIO_PinState res = HAL_GPIO_ReadPin(DQ1_GPIO_Port, DQ1_Pin);
+		if (res == GPIO_PIN_RESET){
+			sprintf(DataChar,"ds18b20 present\r\n");
+		} else {
+			sprintf(DataChar,"ds18b20 absent\r\n");
+		}
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
 		if  ((ID_counter++)%2 == 1){
 			NRF24L01_SetTxAddress(Tx0Address);	/* Set TX address, 5 bytes */
