@@ -21,6 +21,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -34,6 +35,8 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+
+volatile uint32_t stop_flag = 0;
 
 /* USER CODE END PTD */
 
@@ -115,6 +118,7 @@ int main(void)
   MX_GPIO_Init();
   MX_SPI2_Init();
   MX_USART1_UART_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
 	char DataChar[100];
@@ -137,6 +141,10 @@ int main(void)
 	uint32_t lastTime = HAL_GetTick();
 	int16_t  waitTime = 0;
 	uint32_t ID_counter = 0;
+
+	HAL_GPIO_WritePin(DQ_GPIO_Port, DQ_Pin, GPIO_PIN_SET);
+	HAL_TIM_Base_Start_IT(&htim3);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -144,7 +152,18 @@ int main(void)
   while (1)
   {
 #ifdef MASTER
-	if (HAL_GetTick() - lastTime > 2000) {			/* Every 2 seconds */
+	if (HAL_GetTick() - lastTime > 1000) {			/* Every 2 seconds */
+
+		HAL_TIM_Base_Start(&htim3);
+		HAL_GPIO_WritePin(DQ_GPIO_Port, DQ_Pin, GPIO_PIN_RESET);
+
+		//HAL_Delay(1);
+		do	{
+		} while (stop_flag == 0);
+		HAL_TIM_Base_Stop(&htim3);
+		HAL_GPIO_WritePin(DQ_GPIO_Port, DQ_Pin, GPIO_PIN_SET);
+		stop_flag = 0;
+
 		if  ((ID_counter++)%2 == 1){
 			NRF24L01_SetTxAddress(Tx0Address);	/* Set TX address, 5 bytes */
 			sprintf(DataChar,"dev20\r\n");
