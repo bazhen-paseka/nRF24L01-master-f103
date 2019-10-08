@@ -149,31 +149,35 @@ int main(void)
   {
 #ifdef MASTER
 	if (HAL_GetTick() - lastTime > 1000) {			/* Every 2 seconds */
+		char serial_number[8];
+		DS18b20_Get_serial_number(serial_number);
 
-		uint8_t present = DS18b20_Start_strob();
-		if (present){
-			sprintf(DataChar,"ds18b20 present\r\n");
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-		} else {
-			sprintf(DataChar,"ds18b20 absent\r\n");
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		for (int i=0; i<8; i++) {
+		sprintf(DataChar,"%X ", serial_number[i]);
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 		}
 
-		DS18b20_Send_byte(0xCC);
-		DS18b20_Send_byte(0x33);
-		for (int i = 0; i<8; i++) {
-			uint8_t ds_res = DS18b20_Read_byte();
-			sprintf(DataChar," %X",ds_res);
-			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-		}
+		sprintf(DataChar,"\r\n");
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+//		char scratchpad[9];
+//		DS18b20_Read_scratchpad(scratchpad);
+//		for (int i=0; i<9; i++) {
+//		sprintf(DataChar,"%X ", serial_number[i]);
+//		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+//		}
+
+		sprintf(DataChar,"\r\n");
+		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
 
 
 		if  ((ID_counter++)%2 == 1){
 			NRF24L01_SetTxAddress(Tx0Address);	/* Set TX address, 5 bytes */
-			sprintf(DataChar,"\r\ndev20\r\n");
+			sprintf(DataChar,"\r\n%d)dev20\r\n", (int)ID_counter);
 		} else {
 			NRF24L01_SetTxAddress(Tx1Address);	/* Set TX address, 5 bytes */
-			sprintf(DataChar,"\r\ndev21\r\n");
+			sprintf(DataChar,"\r\n%d)dev21\r\n", (int)ID_counter);
 		}
 
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
