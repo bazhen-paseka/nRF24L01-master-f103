@@ -21,7 +21,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "spi.h"
-#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -30,14 +29,12 @@
 	#include <string.h>
 	#include <stdio.h>
 	#include "NRF24L01_sm.h"
+	#include "ds18b20_sm.h"
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
-volatile uint32_t stop_flag = 0;
-// volatile uint32_t ds18b20_present = 0;
 
 /* USER CODE END PTD */
 
@@ -85,7 +82,7 @@ void SystemClock_Config(void);
 	uint8_t MyAddress[] = { 0, 0, 0, 0, 0x22 };	/* My address */
 	uint8_t TxAddress[] = { 0, 0, 0, 0, 0x10 };	/* Other end address */
 #endif
-
+	char DataChar[100];
 /* USER CODE END 0 */
 
 /**
@@ -119,14 +116,13 @@ int main(void)
   MX_GPIO_Init();
   MX_SPI2_Init();
   MX_USART1_UART_Init();
-  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
-	char DataChar[100];
+
 #ifdef MASTER
-		sprintf(DataChar,"\r\n nRF24L01 MASTER v1.0.0 \r\nUART1 for debug started on speed 115200\r\n");
+		sprintf(DataChar,"\r\n nRF24L01 MASTER v1.3.0 \r\nUART1 for debug started on speed 115200\r\n");
 #else
-		sprintf(DataChar,"\r\n nRF24L01 SLAVE v1.0.0 \r\nUART1 for debug started on speed 115200\r\n");
+		sprintf(DataChar,"\r\n nRF24L01 SLAVE v1.3.0 \r\nUART1 for debug started on speed 115200\r\n");
 #endif
 	HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
@@ -144,7 +140,6 @@ int main(void)
 	uint32_t ID_counter = 0;
 
 	HAL_GPIO_WritePin(DQ2_GPIO_Port, DQ2_Pin, GPIO_PIN_SET);
-	HAL_TIM_Base_Start_IT(&htim3);
 
   /* USER CODE END 2 */
 
@@ -155,35 +150,30 @@ int main(void)
 #ifdef MASTER
 	if (HAL_GetTick() - lastTime > 1000) {			/* Every 2 seconds */
 
-		TIM3->ARR = 480;
-		TIM3->CNT = 0;
-		HAL_TIM_Base_Start(&htim3);
-		HAL_GPIO_WritePin(DQ2_GPIO_Port, DQ2_Pin, GPIO_PIN_RESET);
-		do	{		} while (stop_flag == 0);
-		HAL_TIM_Base_Stop(&htim3);
-		HAL_GPIO_WritePin(DQ2_GPIO_Port, DQ2_Pin, GPIO_PIN_SET);
-		stop_flag = 0;
-
-		TIM3->ARR = 60;
-		TIM3->CNT = 0;
-		HAL_TIM_Base_Start(&htim3);
-		do	{		} while (stop_flag == 0);
-		HAL_TIM_Base_Stop(&htim3);
-		stop_flag = 0;
-		GPIO_PinState res = HAL_GPIO_ReadPin(DQ1_GPIO_Port, DQ1_Pin);
-		if (res == GPIO_PIN_RESET){
+		uint8_t present = DS18b20_Start_strob();
+		if (present){
 			sprintf(DataChar,"ds18b20 present\r\n");
+			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 		} else {
 			sprintf(DataChar,"ds18b20 absent\r\n");
+			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 		}
-		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+		DS18b20_Send_byte(0xCC);
+		DS18b20_Send_byte(0x33);
+		for (int i = 0; i<8; i++) {
+			uint8_t ds_res = DS18b20_Read_byte();
+			sprintf(DataChar," %X",ds_res);
+			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+		}
+
 
 		if  ((ID_counter++)%2 == 1){
 			NRF24L01_SetTxAddress(Tx0Address);	/* Set TX address, 5 bytes */
-			sprintf(DataChar,"dev20\r\n");
+			sprintf(DataChar,"\r\ndev20\r\n");
 		} else {
 			NRF24L01_SetTxAddress(Tx1Address);	/* Set TX address, 5 bytes */
-			sprintf(DataChar,"dev21\r\n");
+			sprintf(DataChar,"\r\ndev21\r\n");
 		}
 
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
