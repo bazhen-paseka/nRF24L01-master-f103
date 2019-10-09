@@ -40,7 +40,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define CHECK_BIT(var, pos) (((var) & (1UL << (pos))) != 0)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -120,9 +120,9 @@ int main(void)
 
 
 #ifdef MASTER
-		sprintf(DataChar,"\r\n nRF24L01 MASTER v1.3.0 \r\nUART1 for debug started on speed 115200\r\n");
+		sprintf(DataChar,"\r\n nRF24L01 MASTER v1.4.0 \r\nUART1 for debug started on speed 115200\r\n");
 #else
-		sprintf(DataChar,"\r\n nRF24L01 SLAVE v1.3.0 \r\nUART1 for debug started on speed 115200\r\n");
+		sprintf(DataChar,"\r\n nRF24L01 SLAVE v1.4.0 \r\nUART1 for debug started on speed 115200\r\n");
 #endif
 	HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
@@ -139,7 +139,7 @@ int main(void)
 	int16_t  waitTime = 0;
 	uint32_t ID_counter = 0;
 
-	HAL_GPIO_WritePin(DQ2_GPIO_Port, DQ2_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(DQ_WRITE_GPIO_Port, DQ_WRITE_Pin, GPIO_PIN_SET);
 
   /* USER CODE END 2 */
 
@@ -149,48 +149,20 @@ int main(void)
   {
 #ifdef MASTER
 	if (HAL_GetTick() - lastTime > 1000) {			/* Every 2 seconds */
-
-		char serial_number[8] = {0x28, 0xFF, 0x55, 0x64, 0x4C, 0x04, 0x00, 0x20};
-
-//		memset(serial_number,0,8);
-//		DS18b20_Get_serial_number(serial_number);
-//
-//		for (int i=0; i<8; i++) {
-//		sprintf(DataChar,"%X ", serial_number[i]);
-//		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-//		}
-
-//		sprintf(DataChar,"\r\n");
-//		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-
-
-
-//		sprintf(DataChar,"\r\n");
-//		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
-
-
-
 		if  ((ID_counter++)%2 == 1){
-			ConvertTemp(serial_number);
-			NRF24L01_SetTxAddress(Tx0Address);	/* Set TX address, 5 bytes */
-			sprintf(DataChar,"Convert\r\n%d)dev20\r\n", (int)ID_counter);
-		} else {
-			char scratchpad[9];
-			DS18b20_Read_scratchpad(scratchpad, serial_number);
-			//for (int i=0; i<9; i++) {
-				//uint16_t temp2 = ((scratchpad[1]<<8) + scratchpad[0])>>4;
-				uint16_t temp_1 =  ((0b00000111&scratchpad[1])<<8) | scratchpad[0];
-				float temp_fl = temp_1/16.0;
-				uint16_t temp2 = (int)(temp_fl*100.0);
-				sprintf(DataChar,"Temp: %d.%d", temp2/100, temp2%100);
-				HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
+			DS18b20_ConvertTemp_SkipROM();
 
-			//}
+			NRF24L01_SetTxAddress(Tx0Address);	/* Set TX address, 5 bytes */
+			sprintf(DataChar,"Convert...\r\n%d)dev20\r\n", (int)ID_counter);
+		} else {
+			int temp_i = DS18b20_Get_Temp_SkipROM();
+			float temp_fl = (float)temp_i / 1600.0;
+			sprintf(DataChar,"fl: %.03f; t: %d", temp_fl, temp_i/16);
+			HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
 			NRF24L01_SetTxAddress(Tx1Address);	/* Set TX address, 5 bytes */
 			sprintf(DataChar,"\r\n%d)dev21\r\n", (int)ID_counter);
 		}
-
 		HAL_UART_Transmit(&huart1, (uint8_t *)DataChar, strlen(DataChar), 100);
 
 		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
